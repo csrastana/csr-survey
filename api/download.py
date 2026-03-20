@@ -1,6 +1,7 @@
 """
 Serverless функция для генерации многолистового Excel отчета
 URL: /api/download
+УНИВЕРСАЛЬНАЯ ВЕРСИЯ - поддерживает английский, русский, казахский
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -9,7 +10,6 @@ import requests
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
 from datetime import datetime
 import io
 
@@ -17,12 +17,43 @@ import io
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
 
+# УНИВЕРСАЛЬНЫЙ маппинг городов
 CITY_MAPPING = {
+    # Английский
+    'Astana': 'г. Астана',
+    'Almaty': 'г. Алматы',
+    'Shymkent': 'г. Шымкент',
+    'Aktobe': 'Актобе Г.А.',
+    # Русский
+    'Астана': 'г. Астана',
+    'Алматы': 'г. Алматы',
+    'Шымкент': 'г. Шымкент',
+    'Актобе': 'Актобе Г.А.',
+    # Казахский
+    'Астана қаласы': 'г. Астана',
+    'Алматы қаласы': 'г. Алматы',
+    'Шымкент қаласы': 'г. Шымкент',
+    'Ақтөбе қаласы': 'Актобе Г.А.',
+    # Старые коды
     '1': 'г. Астана',
-    '2': 'г. Алматы', 
+    '2': 'г. Алматы',
     '3': 'г. Шымкент',
     '4': 'Актобе Г.А.'
 }
+
+# Готовность и согласие
+WILLINGNESS_YES = [
+    'Yes, willing to answer now',
+    'Да, готов отвечать сейчас',
+    'Иә, қазір жауап беруге дайынмын'
+]
+
+CONSENT_YES = [
+    'Yes, I agree to participate',
+    'Да, согласен(на) принять участие',
+    'Да, соглашусь принять участие',
+    'Иә, қатысуға келісемін'
+]
 
 QUOTAS = {
     'г. Астана': {'total': 800, 'employed': 608, 'self_employed': 192, 'peo_count': 32},
@@ -47,51 +78,70 @@ def process_data(records):
     processed = []
     
     for record in records:
-        city_code = record.get('city', '')
-        city = CITY_MAPPING.get(str(city_code), 'Неизвестно')
+        # Правильные названия полей из Kobo
+        city_raw = record.get('City:', '')
+        city = CITY_MAPPING.get(city_raw, city_raw)
         
-        # Время и дата
-        time_raw = record.get('group_xn8xb93/time', '')
+        # Если город не распознан - частичное совпадение
+        if city == city_raw and city_raw:
+            for key, value in CITY_MAPPING.items():
+                if key.lower() in city_raw.lower() or city_raw.lower() in key.lower():
+                    city = value
+                    break
+        
+        # Дата и время
+        date_raw = record.get('Visit date:', '')
+        time_raw = record.get('Visit time:', '')
         time_clean = str(time_raw).split('+')[0].split('.')[0] if time_raw else ''
         
-        date_raw = record.get('group_xn8xb93/date', '')
-        
         # Результат
-        result = record.get('group_ip3jm92/result', '')
+        result = record.get('Visit result:', '')
         
-        # Категория
-        willingness = record.get('willingness', '')
-        consent = record.get('consent', '')
+        # Готовность и согласие
+        willingness = record.get('Is the respondent willing to answer?', '')
+        consent = record.get('Are you willing to participate in this survey?', '')
         q08 = record.get('q08_survey2', '')
         
+        # Определяем завершенность
         is_completed = (
-            willingness == 'Да, готов отвечать сейчас' and
-            consent in ['Да, согласен(на) принять участие']
+            willingness in WILLINGNESS_YES and
+            consent in CONSENT_YES
         )
         
+        # Категория
         if is_completed and str(q08).strip():
-            if str(q08).strip() == '1':
+            q08_val = str(q08).strip()
+            if q08_val == '1':
                 category = 'Наемный работник'
-            elif str(q08).strip() in ['2', '3', '4', '5']:
+            elif q08_val in ['2', '3', '4', '5']:
                 category = 'Самозанятый/ИП'
             else:
                 category = 'Другое'
         else:
             category = 'Другое'
         
+        # Язык респондента
+        language = record.get('Respondent language:', '')
+        
+        # Проверка на контакт
+        is_contact = (
+            'Contact established' in result if result else False or
+            'Контакт установлен' in result if result else False
+        )
+        
         processed.append({
             'date': date_raw,
             'time': time_clean,
             'city': city,
-            'peo': record.get('group_xn8xb93/PEO', ''),
-            'segment': record.get('group_xn8xb93/segment_num', ''),
-            'interviewer': record.get('group_xn8xb93/int_name', ''),
+            'peo': record.get('PEO number (electoral precinct)', ''),
+            'segment': record.get('Segment number (1 to 5)', ''),
+            'interviewer': record.get('Interviewer full name:', ''),
             'result': result,
             'category': category,
-            'language': record.get('group_xl1fx65/lang_resp', ''),
-            'attempt': record.get('group_xn8xb93/attempt', ''),
+            'language': language,
+            'attempt': record.get('Attempt number:', ''),
             'is_completed': is_completed,
-            'is_contact': result == 'Контакт установлен - дверь открыли'
+            'is_contact': is_contact
         })
     
     return processed
@@ -145,20 +195,26 @@ def create_dashboard_sheet(wb, processed_data):
     ws['B14'] = 'Завершено'
     ws['C14'] = 'Квота'
     ws['D14'] = 'Прогресс (%)'
+    ws['E14'] = 'Наемных'
+    ws['F14'] = 'Самозанятых'
     
-    for col in ['A14', 'B14', 'C14', 'D14']:
+    for col in ['A14', 'B14', 'C14', 'D14', 'E14', 'F14']:
         ws[col].font = header_font
         ws[col].fill = header_fill
     
     row = 15
     for city, quota in QUOTAS.items():
         city_completed = sum(1 for r in processed_data if r['city'] == city and r['is_completed'])
+        city_employed = sum(1 for r in processed_data if r['city'] == city and r['category'] == 'Наемный работник')
+        city_self = sum(1 for r in processed_data if r['city'] == city and r['category'] == 'Самозанятый/ИП')
         progress = round((city_completed / quota['total'] * 100) if quota['total'] > 0 else 0, 1)
         
         ws[f'A{row}'] = city
         ws[f'B{row}'] = city_completed
         ws[f'C{row}'] = quota['total']
         ws[f'D{row}'] = f"{progress}%"
+        ws[f'E{row}'] = f"{city_employed}/{quota['employed']}"
+        ws[f'F{row}'] = f"{city_self}/{quota['self_employed']}"
         row += 1
     
     # Автоширина
@@ -175,14 +231,12 @@ def create_dashboard_sheet(wb, processed_data):
         ws.column_dimensions[column_letter].width = adjusted_width
 
 def create_peo_sheet(wb, processed_data):
-    """Создание листа по ПЕО (Polling Station)"""
+    """Создание листа по ПЕО"""
     ws = wb.create_sheet("Polling Station")
     
-    # Заголовки
     headers = ['Город', 'ПЕО', 'Интервьюер', 'Всего визитов', 'Завершено', 'RR (%)', 'CR (%)']
     ws.append(headers)
     
-    # Стили заголовков
     header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF")
     
@@ -190,7 +244,7 @@ def create_peo_sheet(wb, processed_data):
         cell.fill = header_fill
         cell.font = header_font
     
-    # Группировка по ПЕО
+    # Группировка
     peo_stats = {}
     for record in processed_data:
         key = (record['city'], record['peo'], record['interviewer'])
@@ -203,20 +257,12 @@ def create_peo_sheet(wb, processed_data):
         if record['is_contact']:
             peo_stats[key]['contacts'] += 1
     
-    # Добавление данных
+    # Данные
     for (city, peo, interviewer), stats in sorted(peo_stats.items()):
         rr = round((stats['completed'] / stats['visits'] * 100) if stats['visits'] > 0 else 0, 1)
         cr = round((stats['contacts'] / stats['visits'] * 100) if stats['visits'] > 0 else 0, 1)
         
-        ws.append([
-            city,
-            peo,
-            interviewer,
-            stats['visits'],
-            stats['completed'],
-            f"{rr}%",
-            f"{cr}%"
-        ])
+        ws.append([city, peo, interviewer, stats['visits'], stats['completed'], f"{rr}%", f"{cr}%"])
     
     # Автоширина
     for column in ws.columns:
@@ -235,11 +281,9 @@ def create_interviewer_sheet(wb, processed_data):
     """Создание листа по интервьюерам"""
     ws = wb.create_sheet("Enumerator & Supervisor")
     
-    # Заголовки
     headers = ['Интервьюер', 'Город', 'Всего визитов', 'Завершено', 'Неконтакты', 'Отказы', 'RR (%)', 'CR (%)']
     ws.append(headers)
     
-    # Стили
     header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF")
     
@@ -247,7 +291,7 @@ def create_interviewer_sheet(wb, processed_data):
         cell.fill = header_fill
         cell.font = header_font
     
-    # Группировка по интервьюерам
+    # Группировка
     int_stats = {}
     for record in processed_data:
         key = (record['interviewer'], record['city'])
@@ -259,25 +303,16 @@ def create_interviewer_sheet(wb, processed_data):
             int_stats[key]['completed'] += 1
         if record['is_contact']:
             int_stats[key]['contacts'] += 1
-        if record['result'] == 'Отказ домохозяйства':
+        if 'refused' in record['result'].lower() or 'Отказ' in record['result']:
             int_stats[key]['refusals'] += 1
     
-    # Добавление данных
+    # Данные
     for (interviewer, city), stats in sorted(int_stats.items()):
         non_contacts = stats['visits'] - stats['contacts']
         rr = round((stats['completed'] / stats['visits'] * 100) if stats['visits'] > 0 else 0, 1)
         cr = round((stats['contacts'] / stats['visits'] * 100) if stats['visits'] > 0 else 0, 1)
         
-        ws.append([
-            interviewer,
-            city,
-            stats['visits'],
-            stats['completed'],
-            non_contacts,
-            stats['refusals'],
-            f"{rr}%",
-            f"{cr}%"
-        ])
+        ws.append([interviewer, city, stats['visits'], stats['completed'], non_contacts, stats['refusals'], f"{rr}%", f"{cr}%"])
     
     # Автоширина
     for column in ws.columns:
@@ -293,14 +328,12 @@ def create_interviewer_sheet(wb, processed_data):
         ws.column_dimensions[column_letter].width = adjusted_width
 
 def create_raw_data_sheet(wb, processed_data):
-    """Создание листа с сырыми данными"""
+    """Создание листа Raw Data"""
     ws = wb.create_sheet("Raw Data")
     
-    # Заголовки
     headers = ['Дата', 'Время', 'Город', 'ПЕО', 'Сегмент', 'Интервьюер', 'Результат', 'Категория', 'Язык', 'Попытка']
     ws.append(headers)
     
-    # Стили
     header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF")
     
@@ -308,7 +341,7 @@ def create_raw_data_sheet(wb, processed_data):
         cell.fill = header_fill
         cell.font = header_font
     
-    # Добавление данных
+    # Данные
     for record in processed_data:
         ws.append([
             record['date'],
@@ -337,20 +370,17 @@ def create_raw_data_sheet(wb, processed_data):
         ws.column_dimensions[column_letter].width = adjusted_width
 
 def create_excel_report(processed_data):
-    """Создание полного Excel отчета"""
+    """Создание Excel отчета"""
     wb = Workbook()
     
-    # Удаляем дефолтный лист
     if 'Sheet' in wb.sheetnames:
         wb.remove(wb['Sheet'])
     
-    # Создаем листы
     create_dashboard_sheet(wb, processed_data)
     create_peo_sheet(wb, processed_data)
     create_interviewer_sheet(wb, processed_data)
     create_raw_data_sheet(wb, processed_data)
     
-    # Сохранение в память
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -360,19 +390,12 @@ def create_excel_report(processed_data):
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            # Загрузка данных
             records = fetch_kobo_data()
-            
-            # Обработка
             processed_data = process_data(records)
-            
-            # Генерация Excel
             excel_bytes = create_excel_report(processed_data)
             
-            # Имя файла
             filename = f"ENPF_Survey_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
             
-            # Ответ
             self.send_response(200)
             self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
