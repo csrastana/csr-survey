@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мониторинг опроса ЕНПФ - CSR</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-download {
+            background: #28a745;
+        }
+
+        .btn-download:hover {
+            background: #218838;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 30px;
+            color: #6c757d;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .section {
+            padding: 30px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .city-grid, .category-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .progress-bar-container {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .progress-info .name {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .progress-info .stats {
+            color: #6c757d;
+            font-size: 13px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #dee2e6;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+
+        .quota-details {
+            font-size: 11px;
+            color: #868e96;
+            margin-top: 5px;
+        }
+
+        .last-updated {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 13px;
+            background: #f8f9fa;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Мониторинг опроса ЕНПФ</h1>
+            <p>Центр стратегических исследований • Режим реального времени</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" onclick="loadData()">
+                🔄 Обновить данные
+            </button>
+            <button class="btn btn-download" onclick="downloadExcel()">
+                📥 Скачать отчет Excel
+            </button>
+        </div>
+
+        <div id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка данных...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://csr-survey.vercel.app';
+        
+        let isLoading = false;
+
+        // Автозагрузка при открытии страницы
+        window.addEventListener('load', () => {
+            loadData();
+        });
+
+        async function loadData() {
+            if (isLoading) return;
+            
+            isLoading = true;
+            const content = document.getElementById('content');
+            
+            content.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Загрузка данных из Kobotoolbox...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/stats`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayData(data);
+                
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Ошибка загрузки данных</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        function displayData(data) {
+            const { overview, by_city, by_category, last_updated } = data;
+            
+            const html = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Всего визитов</h3>
+                        <div class="value">${overview.total_visits}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Завершено</h3>
+                        <div class="value">${overview.completed}</div>
+                        <div class="subtitle">из ${overview.total_quota} (${overview.quota_progress}%)</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Response Rate</h3>
+                        <div class="value">${overview.response_rate}%</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Contact Rate</h3>
+                        <div class="value">${overview.contact_rate}%</div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>📍 Прогресс по городам</h2>
+                    <div class="city-grid">
+                        ${Object.entries(by_city).map(([city, stats]) => `
+                            <div class="progress-bar-container">
+                                <div class="progress-info">
+                                    <span class="name">${city}</span>
+                                    <span class="stats">${stats.completed} / ${stats.quota_total} (${stats.progress}%)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${Math.min(stats.progress, 100)}%"></div>
+                                </div>
+                                <div class="quota-details">
+                                    ${stats.peo_count} ПЕО × 25 человек | 
+                                    Наемных: ${stats.employed}/${stats.quota_employed} | 
+                                    Самозанятых: ${stats.self_employed}/${stats.quota_self_employed}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>👥 Прогресс по категориям</h2>
+                    <div class="category-grid">
+                        <div class="progress-bar-container">
+                            <div class="progress-info">
+                                <span class="name">Наемные работники</span>
+                                <span class="stats">${by_category.employed.completed} / ${by_category.employed.quota} (${by_category.employed.progress}%)</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(by_category.employed.progress, 100)}%"></div>
+                            </div>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-info">
+                                <span class="name">Самозанятые / ИП</span>
+                                <span class="stats">${by_category.self_employed.completed} / ${by_category.self_employed.quota} (${by_category.self_employed.progress}%)</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${Math.min(by_category.self_employed.progress, 100)}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="last-updated">
+                    Последнее обновление: ${last_updated}
+                </div>
+            `;
+            
+            document.getElementById('content').innerHTML = html;
+        }
+
+        async function downloadExcel() {
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Генерация...';
+                
+                const response = await fetch(`${API_BASE}/api/download`);
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка генерации отчета');
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ENPF_Survey_Report_${new Date().toISOString().slice(0,10)}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                btn.disabled = false;
+                btn.innerHTML = '📥 Скачать отчет Excel';
+                
+            } catch (error) {
+                alert('Ошибка скачивания: ' + error.message);
+                event.target.disabled = false;
+                event.target.innerHTML = '📥 Скачать отчет Excel';
+            }
+        }
+    </script>
+</body>
+</html>
