@@ -1,7 +1,7 @@
 """
 Serverless функция для генерации многолистового Excel отчета
 URL: /api/download
-УНИВЕРСАЛЬНАЯ ВЕРСИЯ - поддерживает английский, русский, казахский
+ИСПРАВЛЕННАЯ ВЕРСИЯ - с реальными названиями полей из XLSForm
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -17,43 +17,22 @@ import io
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
 
-# УНИВЕРСАЛЬНЫЙ маппинг городов
-CITY_MAPPING = {
-    # Английский
-    'Astana': 'г. Астана',
-    'Almaty': 'г. Алматы',
-    'Shymkent': 'г. Шымкент',
-    'Aktobe': 'Актобе Г.А.',
-    # Русский
-    'Астана': 'г. Астана',
-    'Алматы': 'г. Алматы',
-    'Шымкент': 'г. Шымкент',
-    'Актобе': 'Актобе Г.А.',
-    # Казахский
-    'Астана қаласы': 'г. Астана',
-    'Алматы қаласы': 'г. Алматы',
-    'Шымкент қаласы': 'г. Шымкент',
-    'Ақтөбе қаласы': 'Актобе Г.А.',
-    # Старые коды
-    '1': 'г. Астана',
-    '2': 'г. Алматы',
-    '3': 'г. Шымкент',
-    '4': 'Актобе Г.А.'
+# Маппинг кодов
+CITY_CODES = {
+    '710000000': 'г. Астана',
+    '750000000': 'г. Алматы',
+    '790000000': 'г. Шымкент',
+    '151000000': 'Актобе Г.А.'
 }
 
-# Готовность и согласие
-WILLINGNESS_YES = [
-    'Yes, willing to answer now',
-    'Да, готов отвечать сейчас',
-    'Иә, қазір жауап беруге дайынмын'
-]
-
-CONSENT_YES = [
-    'Yes, I agree to participate',
-    'Да, согласен(на) принять участие',
-    'Да, соглашусь принять участие',
-    'Иә, қатысуға келісемін'
-]
+RESULT_CODES = {
+    '1': 'Контакт установлен',
+    '2': 'Неконтакт',
+    '3': 'Недоступный адрес',
+    '4': 'Языковой барьер',
+    '5': 'Отказ',
+    '6': 'Другое'
+}
 
 QUOTAS = {
     'г. Астана': {'total': 800, 'employed': 608, 'self_employed': 192, 'peo_count': 32},
@@ -78,34 +57,28 @@ def process_data(records):
     processed = []
     
     for record in records:
-        # Правильные названия полей из Kobo
-        city_raw = record.get('City:', '')
-        city = CITY_MAPPING.get(city_raw, city_raw)
+        # Правильные названия полей
+        city_code = record.get('city', '')
+        city = CITY_CODES.get(str(city_code), f'Неизвестно ({city_code})')
         
-        # Если город не распознан - частичное совпадение
-        if city == city_raw and city_raw:
-            for key, value in CITY_MAPPING.items():
-                if key.lower() in city_raw.lower() or city_raw.lower() in key.lower():
-                    city = value
-                    break
-        
-        # Дата и время
-        date_raw = record.get('Visit date:', '')
-        time_raw = record.get('Visit time:', '')
+        # Дата и время (из группы group_xn8xb93)
+        date_raw = record.get('group_xn8xb93/date', '')
+        time_raw = record.get('group_xn8xb93/time', '')
         time_clean = str(time_raw).split('+')[0].split('.')[0] if time_raw else ''
         
-        # Результат
-        result = record.get('Visit result:', '')
+        # Результат (из группы group_ip3jm92)
+        result_code = record.get('group_ip3jm92/result', '')
+        result = RESULT_CODES.get(str(result_code), f'Неизвестно ({result_code})')
         
-        # Готовность и согласие
-        willingness = record.get('Is the respondent willing to answer?', '')
-        consent = record.get('Are you willing to participate in this survey?', '')
+        # Готовность и согласие (коды!)
+        willingness = record.get('willingness', '')
+        consent = record.get('consent', '')
         q08 = record.get('q08_survey2', '')
         
         # Определяем завершенность
         is_completed = (
-            willingness in WILLINGNESS_YES and
-            consent in CONSENT_YES
+            str(willingness) == '1' and
+            str(consent) == '1'
         )
         
         # Категория
@@ -120,26 +93,23 @@ def process_data(records):
         else:
             category = 'Другое'
         
-        # Язык респондента
-        language = record.get('Respondent language:', '')
+        # Язык респондента (из группы group_xl1fx65)
+        language = record.get('group_xl1fx65/lang_resp', '')
         
         # Проверка на контакт
-        is_contact = (
-            'Contact established' in result if result else False or
-            'Контакт установлен' in result if result else False
-        )
+        is_contact = str(result_code) == '1'
         
         processed.append({
             'date': date_raw,
             'time': time_clean,
             'city': city,
-            'peo': record.get('PEO number (electoral precinct)', ''),
-            'segment': record.get('Segment number (1 to 5)', ''),
-            'interviewer': record.get('Interviewer full name:', ''),
+            'peo': record.get('group_xn8xb93/PEO', ''),
+            'segment': record.get('group_xn8xb93/segment_num', ''),
+            'interviewer': record.get('group_xn8xb93/int_name', ''),
             'result': result,
             'category': category,
             'language': language,
-            'attempt': record.get('Attempt number:', ''),
+            'attempt': record.get('group_xn8xb93/attempt', ''),
             'is_completed': is_completed,
             'is_contact': is_contact
         })
@@ -303,7 +273,7 @@ def create_interviewer_sheet(wb, processed_data):
             int_stats[key]['completed'] += 1
         if record['is_contact']:
             int_stats[key]['contacts'] += 1
-        if 'refused' in record['result'].lower() or 'Отказ' in record['result']:
+        if 'Отказ' in record['result']:
             int_stats[key]['refusals'] += 1
     
     # Данные
