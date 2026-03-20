@@ -12,15 +12,28 @@ from datetime import datetime
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
 
-# Маппинги
+# Маппинги городов (из английского в русский)
 CITY_MAPPING = {
+    'Astana': 'г. Астана',
+    'Almaty': 'г. Алматы',
+    'Shymkent': 'г. Шымкент',
+    'Aktobe': 'Актобе Г.А.',
+    # На всякий случай добавим и старые варианты
     '1': 'г. Астана',
-    '2': 'г. Алматы', 
+    '2': 'г. Алматы',
     '3': 'г. Шымкент',
     '4': 'Актобе Г.А.'
 }
 
+# Маппинги результатов визита
 RESULT_MAPPING = {
+    'Contact established - door opened': 'Контакт установлен',
+    'No contact - no one opened the door': 'Неконтакт',
+    'Household refused': 'Отказ',
+    'Language barrier': 'Языковой барьер',
+    'Invalid address - building demolished/under construction': 'Недоступный адрес',
+    'Other (specify)': 'Другое',
+    # Русские варианты на всякий случай
     'Контакт установлен - дверь открыли': 'Контакт установлен',
     'Неконтакт - никто не открыл дверь': 'Неконтакт',
     'Отказ домохозяйства': 'Отказ',
@@ -29,34 +42,30 @@ RESULT_MAPPING = {
     'Другое (уточните)': 'Другое'
 }
 
-# ОБНОВЛЕННЫЕ КВОТЫ
-# Астана = 32 ПЕО * 25 человек (19 наемных + 6 самозанятых)
-# Алматы = 39 ПЕО * 25 человек (19 наемных + 6 самозанятых)
-# Актобе = 21 ПЕО * 25 человек (19 наемных + 6 самозанятых)
-# Шымкент = 28 ПЕО * 25 человек (19 наемных + 6 самозанятых)
+# КВОТЫ
 QUOTAS = {
     'г. Астана': {
-        'total': 800,        # 32 ПЕО * 25
-        'employed': 608,     # 32 ПЕО * 19
-        'self_employed': 192, # 32 ПЕО * 6
+        'total': 800,
+        'employed': 608,
+        'self_employed': 192,
         'peo_count': 32
     },
     'г. Алматы': {
-        'total': 975,        # 39 ПЕО * 25
-        'employed': 741,     # 39 ПЕО * 19
-        'self_employed': 234, # 39 ПЕО * 6
+        'total': 975,
+        'employed': 741,
+        'self_employed': 234,
         'peo_count': 39
     },
     'г. Шымкент': {
-        'total': 700,        # 28 ПЕО * 25
-        'employed': 532,     # 28 ПЕО * 19
-        'self_employed': 168, # 28 ПЕО * 6
+        'total': 700,
+        'employed': 532,
+        'self_employed': 168,
         'peo_count': 28
     },
     'Актобе Г.А.': {
-        'total': 525,        # 21 ПЕО * 25
-        'employed': 399,     # 21 ПЕО * 19
-        'self_employed': 126, # 21 ПЕО * 6
+        'total': 525,
+        'employed': 399,
+        'self_employed': 126,
         'peo_count': 21
     }
 }
@@ -74,44 +83,50 @@ def fetch_kobo_data():
 
 def process_record(record):
     """Обработка одной записи"""
-    # Извлекаем поля из групп Kobo
-    result_text = record.get('group_ip3jm92/result', '')
-    willingness = record.get('willingness', '')
-    consent = record.get('consent', '')
+    # ПРАВИЛЬНЫЕ названия полей из Kobo
+    city_raw = record.get('City:', '')  # "Astana", "Almaty", etc.
+    city = CITY_MAPPING.get(city_raw, city_raw)
+    
+    # Результат визита
+    result_raw = record.get('Visit result:', '')
+    result = RESULT_MAPPING.get(result_raw, result_raw if result_raw else 'Неизвестно')
+    
+    # Готовность и согласие
+    willingness = record.get('Is the respondent willing to answer?', '')
+    consent = record.get('Are you willing to participate in this survey?', '')
+    
+    # Категория работника
     q08 = record.get('q08_survey2', '')
-    city_code = record.get('city', '')
-    int_name = record.get('group_xn8xb93/int_name', '')
-    peo = record.get('group_xn8xb93/PEO', '')
     
-    # Определяем город
-    city = CITY_MAPPING.get(str(city_code), 'Неизвестно')
+    # Другие поля
+    interviewer = record.get('Interviewer full name:', '')
+    peo = record.get('PEO number (electoral precinct)', '')
     
-    # Определяем результат визита
-    result = RESULT_MAPPING.get(result_text, result_text if result_text else 'Неизвестно')
-    
-    # Определяем категорию
+    # Определяем завершенность
     is_completed = (
-        willingness == 'Да, готов отвечать сейчас' and
-        consent in ['Да, согласен(на) принять участие', 'Да, соглашусь принять участие']
+        willingness in ['Yes, willing to answer now', 'Да, готов отвечать сейчас'] and
+        consent in ['Yes, I agree to participate', 'Да, согласен(на) принять участие', 'Да, соглашусь принять участие']
     )
     
+    # Определяем категорию
     if is_completed and str(q08).strip():
-        if str(q08).strip() == '1':
-            category = 'employed'
-        elif str(q08).strip() in ['2', '3', '4', '5']:
-            category = 'self_employed'
+        q08_val = str(q08).strip()
+        if q08_val == '1':
+            category = 'employed'  # Наемный работник
+        elif q08_val in ['2', '3', '4', '5']:
+            category = 'self_employed'  # Самозанятый/ИП
         else:
             category = 'other'
     else:
         category = 'other'
     
     # Проверка на контакт
-    is_contact = result in ['Контакт установлен']
-    is_refusal = result == 'Отказ'
+    is_contact = 'Contact established' in result or 'Контакт установлен' in result
+    is_refusal = 'refused' in result.lower() or 'Отказ' in result
     
     return {
         'city': city,
-        'interviewer': int_name,
+        'interviewer': interviewer,
         'peo': peo,
         'result': result,
         'category': category,
