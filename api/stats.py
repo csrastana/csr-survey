@@ -1,7 +1,7 @@
 """
 Serverless функция для получения статистики опроса
 URL: /api/stats
-УНИВЕРСАЛЬНАЯ ВЕРСИЯ - поддерживает английский, русский, казахский
+ИСПРАВЛЕННАЯ ВЕРСИЯ - с реальными названиями полей из XLSForm
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -13,66 +13,23 @@ from datetime import datetime
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
 
-# УНИВЕРСАЛЬНЫЙ маппинг городов (английский, русский, казахский)
-CITY_MAPPING = {
-    # Английский
-    'Astana': 'г. Астана',
-    'Almaty': 'г. Алматы',
-    'Shymkent': 'г. Шымкент',
-    'Aktobe': 'Актобе Г.А.',
-    # Русский
-    'Астана': 'г. Астана',
-    'Алматы': 'г. Алматы',
-    'Шымкент': 'г. Шымкент',
-    'Актобе': 'Актобе Г.А.',
-    # Казахский (если используется)
-    'Астана қаласы': 'г. Астана',
-    'Алматы қаласы': 'г. Алматы',
-    'Шымкент қаласы': 'г. Шымкент',
-    'Ақтөбе қаласы': 'Актобе Г.А.',
-    # Старые коды (на всякий случай)
-    '1': 'г. Астана',
-    '2': 'г. Алматы',
-    '3': 'г. Шымкент',
-    '4': 'Актобе Г.А.'
+# Маппинг кодов городов (из XLSForm choices)
+CITY_CODES = {
+    '710000000': 'г. Астана',
+    '750000000': 'г. Алматы',
+    '790000000': 'г. Шымкент',
+    '151000000': 'Актобе Г.А.'
 }
 
-# УНИВЕРСАЛЬНЫЙ маппинг результатов визита
-RESULT_MAPPING = {
-    # Английский
-    'Contact established - door opened': 'Контакт установлен',
-    'No contact - no one opened the door': 'Неконтакт',
-    'Household refused': 'Отказ',
-    'Language barrier': 'Языковой барьер',
-    'Invalid address - building demolished/under construction': 'Недоступный адрес',
-    'Other (specify)': 'Другое',
-    # Русский
-    'Контакт установлен - дверь открыли': 'Контакт установлен',
-    'Неконтакт - никто не открыл дверь': 'Неконтакт',
-    'Отказ домохозяйства': 'Отказ',
-    'Языковой барьер': 'Языковой барьер',
-    'Недоступный адрес - здание снесено/в стройке': 'Недоступный адрес',
-    'Другое (уточните)': 'Другое',
-    # Казахский (если используется)
-    'Байланыс орнатылды - есік ашылды': 'Контакт установлен',
-    'Байланыс жоқ - ешкім есікті ашпады': 'Неконтакт',
-    'Үй шаруашылығы бас тартты': 'Отказ'
+# Маппинг кодов результатов
+RESULT_CODES = {
+    '1': 'Контакт установлен',
+    '2': 'Неконтакт',
+    '3': 'Недоступный адрес',
+    '4': 'Языковой барьер',
+    '5': 'Отказ',
+    '6': 'Другое'
 }
-
-# Готовность отвечать (все языки)
-WILLINGNESS_YES = [
-    'Yes, willing to answer now',  # English
-    'Да, готов отвечать сейчас',  # Russian
-    'Иә, қазір жауап беруге дайынмын'  # Kazakh (если есть)
-]
-
-# Согласие участвовать (все языки)
-CONSENT_YES = [
-    'Yes, I agree to participate',  # English
-    'Да, согласен(на) принять участие',  # Russian
-    'Да, соглашусь принять участие',  # Russian (альтернатива)
-    'Иә, қатысуға келісемін'  # Kazakh (если есть)
-]
 
 # КВОТЫ
 QUOTAS = {
@@ -115,36 +72,29 @@ def fetch_kobo_data():
 
 def process_record(record):
     """Обработка одной записи"""
-    # Правильные названия полей из Kobo
-    city_raw = record.get('City:', '')
-    city = CITY_MAPPING.get(city_raw, city_raw)  # Универсальный маппинг
+    # Правильные названия полей (из XLSForm)
+    # Поля в группе group_xn8xb93
+    city_code = record.get('city', '')  # Это КОД, не текст!
+    city = CITY_CODES.get(str(city_code), f'Неизвестно ({city_code})')
     
-    # Если город не распознан - попробуем найти частичное совпадение
-    if city == city_raw and city_raw:
-        for key, value in CITY_MAPPING.items():
-            if key.lower() in city_raw.lower() or city_raw.lower() in key.lower():
-                city = value
-                break
+    peo = record.get('group_xn8xb93/PEO', '')
+    interviewer = record.get('group_xn8xb93/int_name', '')
     
-    # Результат визита
-    result_raw = record.get('Visit result:', '')
-    result = RESULT_MAPPING.get(result_raw, result_raw if result_raw else 'Неизвестно')
+    # Результат визита (в группе group_ip3jm92)
+    result_code = record.get('group_ip3jm92/result', '')
+    result = RESULT_CODES.get(str(result_code), f'Неизвестно ({result_code})')
     
-    # Готовность и согласие (проверяем все языки)
-    willingness = record.get('Is the respondent willing to answer?', '')
-    consent = record.get('Are you willing to participate in this survey?', '')
+    # Готовность и согласие (коды!)
+    willingness = record.get('willingness', '')
+    consent = record.get('consent', '')
     
     # Категория работника
     q08 = record.get('q08_survey2', '')
     
-    # Другие поля
-    interviewer = record.get('Interviewer full name:', '')
-    peo = record.get('PEO number (electoral precinct)', '')
-    
-    # Определяем завершенность (проверка по всем языкам)
+    # Определяем завершенность (по кодам!)
     is_completed = (
-        willingness in WILLINGNESS_YES and
-        consent in CONSENT_YES
+        str(willingness) == '1' and  # '1' = Yes, willing to answer now
+        str(consent) == '1'          # '1' = Yes, I agree to participate
     )
     
     # Определяем категорию
@@ -159,18 +109,9 @@ def process_record(record):
     else:
         category = 'other'
     
-    # Проверка на контакт (проверяем и английский и русский)
-    is_contact = (
-        'Contact established' in result or 
-        'Контакт установлен' in result or
-        'Байланыс орнатылды' in result
-    )
-    
-    is_refusal = (
-        'refused' in result.lower() or 
-        'Отказ' in result or
-        'бас тартты' in result
-    )
+    # Проверка на контакт
+    is_contact = str(result_code) == '1'  # '1' = Contact established
+    is_refusal = str(result_code) == '5'  # '5' = Household refusal
     
     return {
         'city': city,
