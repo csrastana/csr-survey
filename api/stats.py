@@ -1,6 +1,7 @@
 """
 Serverless функция для получения статистики опроса
 URL: /api/stats
+УНИВЕРСАЛЬНАЯ ВЕРСИЯ - поддерживает английский, русский, казахский
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -12,35 +13,66 @@ from datetime import datetime
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
 
-# Маппинги городов (из английского в русский)
+# УНИВЕРСАЛЬНЫЙ маппинг городов (английский, русский, казахский)
 CITY_MAPPING = {
+    # Английский
     'Astana': 'г. Астана',
     'Almaty': 'г. Алматы',
     'Shymkent': 'г. Шымкент',
     'Aktobe': 'Актобе Г.А.',
-    # На всякий случай добавим и старые варианты
+    # Русский
+    'Астана': 'г. Астана',
+    'Алматы': 'г. Алматы',
+    'Шымкент': 'г. Шымкент',
+    'Актобе': 'Актобе Г.А.',
+    # Казахский (если используется)
+    'Астана қаласы': 'г. Астана',
+    'Алматы қаласы': 'г. Алматы',
+    'Шымкент қаласы': 'г. Шымкент',
+    'Ақтөбе қаласы': 'Актобе Г.А.',
+    # Старые коды (на всякий случай)
     '1': 'г. Астана',
     '2': 'г. Алматы',
     '3': 'г. Шымкент',
     '4': 'Актобе Г.А.'
 }
 
-# Маппинги результатов визита
+# УНИВЕРСАЛЬНЫЙ маппинг результатов визита
 RESULT_MAPPING = {
+    # Английский
     'Contact established - door opened': 'Контакт установлен',
     'No contact - no one opened the door': 'Неконтакт',
     'Household refused': 'Отказ',
     'Language barrier': 'Языковой барьер',
     'Invalid address - building demolished/under construction': 'Недоступный адрес',
     'Other (specify)': 'Другое',
-    # Русские варианты на всякий случай
+    # Русский
     'Контакт установлен - дверь открыли': 'Контакт установлен',
     'Неконтакт - никто не открыл дверь': 'Неконтакт',
     'Отказ домохозяйства': 'Отказ',
     'Языковой барьер': 'Языковой барьер',
     'Недоступный адрес - здание снесено/в стройке': 'Недоступный адрес',
-    'Другое (уточните)': 'Другое'
+    'Другое (уточните)': 'Другое',
+    # Казахский (если используется)
+    'Байланыс орнатылды - есік ашылды': 'Контакт установлен',
+    'Байланыс жоқ - ешкім есікті ашпады': 'Неконтакт',
+    'Үй шаруашылығы бас тартты': 'Отказ'
 }
+
+# Готовность отвечать (все языки)
+WILLINGNESS_YES = [
+    'Yes, willing to answer now',  # English
+    'Да, готов отвечать сейчас',  # Russian
+    'Иә, қазір жауап беруге дайынмын'  # Kazakh (если есть)
+]
+
+# Согласие участвовать (все языки)
+CONSENT_YES = [
+    'Yes, I agree to participate',  # English
+    'Да, согласен(на) принять участие',  # Russian
+    'Да, соглашусь принять участие',  # Russian (альтернатива)
+    'Иә, қатысуға келісемін'  # Kazakh (если есть)
+]
 
 # КВОТЫ
 QUOTAS = {
@@ -83,15 +115,22 @@ def fetch_kobo_data():
 
 def process_record(record):
     """Обработка одной записи"""
-    # ПРАВИЛЬНЫЕ названия полей из Kobo
-    city_raw = record.get('City:', '')  # "Astana", "Almaty", etc.
-    city = CITY_MAPPING.get(city_raw, city_raw)
+    # Правильные названия полей из Kobo
+    city_raw = record.get('City:', '')
+    city = CITY_MAPPING.get(city_raw, city_raw)  # Универсальный маппинг
+    
+    # Если город не распознан - попробуем найти частичное совпадение
+    if city == city_raw and city_raw:
+        for key, value in CITY_MAPPING.items():
+            if key.lower() in city_raw.lower() or city_raw.lower() in key.lower():
+                city = value
+                break
     
     # Результат визита
     result_raw = record.get('Visit result:', '')
     result = RESULT_MAPPING.get(result_raw, result_raw if result_raw else 'Неизвестно')
     
-    # Готовность и согласие
+    # Готовность и согласие (проверяем все языки)
     willingness = record.get('Is the respondent willing to answer?', '')
     consent = record.get('Are you willing to participate in this survey?', '')
     
@@ -102,10 +141,10 @@ def process_record(record):
     interviewer = record.get('Interviewer full name:', '')
     peo = record.get('PEO number (electoral precinct)', '')
     
-    # Определяем завершенность
+    # Определяем завершенность (проверка по всем языкам)
     is_completed = (
-        willingness in ['Yes, willing to answer now', 'Да, готов отвечать сейчас'] and
-        consent in ['Yes, I agree to participate', 'Да, согласен(на) принять участие', 'Да, соглашусь принять участие']
+        willingness in WILLINGNESS_YES and
+        consent in CONSENT_YES
     )
     
     # Определяем категорию
@@ -120,9 +159,18 @@ def process_record(record):
     else:
         category = 'other'
     
-    # Проверка на контакт
-    is_contact = 'Contact established' in result or 'Контакт установлен' in result
-    is_refusal = 'refused' in result.lower() or 'Отказ' in result
+    # Проверка на контакт (проверяем и английский и русский)
+    is_contact = (
+        'Contact established' in result or 
+        'Контакт установлен' in result or
+        'Байланыс орнатылды' in result
+    )
+    
+    is_refusal = (
+        'refused' in result.lower() or 
+        'Отказ' in result or
+        'бас тартты' in result
+    )
     
     return {
         'city': city,
