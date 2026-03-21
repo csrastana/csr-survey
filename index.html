@@ -32,6 +32,7 @@
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
         }
 
         .header h1 {
@@ -42,6 +43,41 @@
         .header p {
             opacity: 0.9;
             font-size: 14px;
+        }
+
+        .language-selector {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .language-selector label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .language-selector select {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .language-selector select:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .language-selector select option {
+            background: #667eea;
+            color: white;
         }
 
         .controls {
@@ -247,29 +283,43 @@
                 width: 100%;
                 justify-content: center;
             }
+
+            .language-selector {
+                position: static;
+                justify-content: center;
+                margin-top: 15px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 Мониторинг опроса ЕНПФ</h1>
-            <p>Центр стратегических исследований • Режим реального времени</p>
+            <div class="language-selector">
+                <label id="lang-label">🌐</label>
+                <select id="language-select" onchange="changeLanguage()">
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                    <option value="kk">Қазақша</option>
+                </select>
+            </div>
+            <h1 id="header-title">📊 Мониторинг опроса ЕНПФ</h1>
+            <p id="header-subtitle">Центр стратегических исследований • Режим реального времени</p>
         </div>
 
         <div class="controls">
             <button class="btn" onclick="loadData()">
-                🔄 Обновить данные
+                <span id="btn-refresh">🔄 Обновить данные</span>
             </button>
             <button class="btn btn-download" onclick="downloadExcel()">
-                📥 Скачать отчет Excel
+                <span id="btn-download">📥 Скачать отчет Excel</span>
             </button>
         </div>
 
         <div id="content">
             <div class="loading">
                 <div class="spinner"></div>
-                <p>Загрузка данных...</p>
+                <p id="loading-text">Загрузка данных...</p>
             </div>
         </div>
     </div>
@@ -278,22 +328,122 @@
         const API_BASE = 'https://csr-survey.vercel.app';
         
         let isLoading = false;
+        let currentLang = 'ru';
 
-        // Автозагрузка при открытии страницы
+        // Переводы
+        const translations = {
+            ru: {
+                headerTitle: '📊 Мониторинг опроса ЕНПФ',
+                headerSubtitle: 'Центр стратегических исследований • Режим реального времени',
+                btnRefresh: '🔄 Обновить данные',
+                btnDownload: '📥 Скачать отчет Excel',
+                loadingText: 'Загрузка данных...',
+                totalVisits: 'Всего визитов',
+                completed: 'Завершено',
+                of: 'из',
+                responseRate: 'Response Rate',
+                contactRate: 'Contact Rate',
+                cityProgress: '📍 Прогресс по городам',
+                categoryProgress: '👥 Прогресс по категориям',
+                employed: 'Наемные работники',
+                selfEmployed: 'Самозанятые / ИП',
+                lastUpdated: 'Последнее обновление:',
+                peoMultiplier: 'ПЕО × 25 человек',
+                employedShort: 'Наемных:',
+                selfEmployedShort: 'Самозанятых:',
+                errorLoading: 'Ошибка загрузки данных'
+            },
+            en: {
+                headerTitle: '📊 ENPF Survey Monitoring',
+                headerSubtitle: 'Center for Strategic Research • Real-time monitoring',
+                btnRefresh: '🔄 Refresh data',
+                btnDownload: '📥 Download Excel report',
+                loadingText: 'Loading data...',
+                totalVisits: 'Total visits',
+                completed: 'Completed',
+                of: 'of',
+                responseRate: 'Response Rate',
+                contactRate: 'Contact Rate',
+                cityProgress: '📍 Progress by city',
+                categoryProgress: '👥 Progress by category',
+                employed: 'Wage employees',
+                selfEmployed: 'Self-employed / IE',
+                lastUpdated: 'Last updated:',
+                peoMultiplier: 'PEO × 25 people',
+                employedShort: 'Employed:',
+                selfEmployedShort: 'Self-employed:',
+                errorLoading: 'Data loading error'
+            },
+            kk: {
+                headerTitle: '📊 БЖЗҚ сауалнамасын бақылау',
+                headerSubtitle: 'Стратегиялық зерттеулер орталығы • Нақты уақыт режимі',
+                btnRefresh: '🔄 Деректерді жаңарту',
+                btnDownload: '📥 Excel есебін жүктеу',
+                loadingText: 'Деректер жүктелуде...',
+                totalVisits: 'Барлық сапарлар',
+                completed: 'Аяқталды',
+                of: 'дан',
+                responseRate: 'Жауап беру деңгейі',
+                contactRate: 'Байланыс деңгейі',
+                cityProgress: '📍 Қалалар бойынша прогресс',
+                categoryProgress: '👥 Санаттар бойынша прогресс',
+                employed: 'Жалдамалы қызметкерлер',
+                selfEmployed: 'Өзін-өзі жұмыспен қамтығандар / ЖК',
+                lastUpdated: 'Соңғы жаңарту:',
+                peoMultiplier: 'СУО × 25 адам',
+                employedShort: 'Жалдамалы:',
+                selfEmployedShort: 'Өзін-өзі қамтыған:',
+                errorLoading: 'Деректерді жүктеу қатесі'
+            }
+        };
+
+        // Загрузка сохраненного языка
         window.addEventListener('load', () => {
+            const savedLang = localStorage.getItem('language') || 'ru';
+            currentLang = savedLang;
+            document.getElementById('language-select').value = savedLang;
+            updateInterfaceLanguage();
             loadData();
         });
+
+        function changeLanguage() {
+            const select = document.getElementById('language-select');
+            currentLang = select.value;
+            localStorage.setItem('language', currentLang);
+            updateInterfaceLanguage();
+            
+            // Если данные уже загружены, обновляем их отображение
+            const content = document.getElementById('content');
+            if (!content.querySelector('.loading')) {
+                loadData();
+            }
+        }
+
+        function updateInterfaceLanguage() {
+            const t = translations[currentLang];
+            
+            document.getElementById('header-title').textContent = t.headerTitle;
+            document.getElementById('header-subtitle').textContent = t.headerSubtitle;
+            document.getElementById('btn-refresh').textContent = t.btnRefresh;
+            document.getElementById('btn-download').textContent = t.btnDownload;
+            
+            const loadingText = document.getElementById('loading-text');
+            if (loadingText) {
+                loadingText.textContent = t.loadingText;
+            }
+        }
 
         async function loadData() {
             if (isLoading) return;
             
             isLoading = true;
             const content = document.getElementById('content');
+            const t = translations[currentLang];
             
             content.innerHTML = `
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p>Загрузка данных из Kobotoolbox...</p>
+                    <p id="loading-text">${t.loadingText}</p>
                 </div>
             `;
 
@@ -310,7 +460,7 @@
             } catch (error) {
                 content.innerHTML = `
                     <div class="error">
-                        <h3>❌ Ошибка загрузки данных</h3>
+                        <h3>❌ ${t.errorLoading}</h3>
                         <p>${error.message}</p>
                     </div>
                 `;
@@ -321,30 +471,31 @@
 
         function displayData(data) {
             const { overview, by_city, by_category, last_updated } = data;
+            const t = translations[currentLang];
             
             const html = `
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <h3>Всего визитов</h3>
+                        <h3>${t.totalVisits}</h3>
                         <div class="value">${overview.total_visits}</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Завершено</h3>
+                        <h3>${t.completed}</h3>
                         <div class="value">${overview.completed}</div>
-                        <div class="subtitle">из ${overview.total_quota} (${overview.quota_progress}%)</div>
+                        <div class="subtitle">${t.of} ${overview.total_quota} (${overview.quota_progress}%)</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Response Rate</h3>
+                        <h3>${t.responseRate}</h3>
                         <div class="value">${overview.response_rate}%</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Contact Rate</h3>
+                        <h3>${t.contactRate}</h3>
                         <div class="value">${overview.contact_rate}%</div>
                     </div>
                 </div>
 
                 <div class="section">
-                    <h2>📍 Прогресс по городам</h2>
+                    <h2>${t.cityProgress}</h2>
                     <div class="city-grid">
                         ${Object.entries(by_city).map(([city, stats]) => `
                             <div class="progress-bar-container">
@@ -356,9 +507,9 @@
                                     <div class="progress-fill" style="width: ${Math.min(stats.progress, 100)}%"></div>
                                 </div>
                                 <div class="quota-details">
-                                    ${stats.peo_count} ПЕО × 25 человек | 
-                                    Наемных: ${stats.employed}/${stats.quota_employed} | 
-                                    Самозанятых: ${stats.self_employed}/${stats.quota_self_employed}
+                                    ${stats.peo_count} ${t.peoMultiplier} | 
+                                    ${t.employedShort} ${stats.employed}/${stats.quota_employed} | 
+                                    ${t.selfEmployedShort} ${stats.self_employed}/${stats.quota_self_employed}
                                 </div>
                             </div>
                         `).join('')}
@@ -366,11 +517,11 @@
                 </div>
 
                 <div class="section">
-                    <h2>👥 Прогресс по категориям</h2>
+                    <h2>${t.categoryProgress}</h2>
                     <div class="category-grid">
                         <div class="progress-bar-container">
                             <div class="progress-info">
-                                <span class="name">Наемные работники</span>
+                                <span class="name">${t.employed}</span>
                                 <span class="stats">${by_category.employed.completed} / ${by_category.employed.quota} (${by_category.employed.progress}%)</span>
                             </div>
                             <div class="progress-bar">
@@ -379,7 +530,7 @@
                         </div>
                         <div class="progress-bar-container">
                             <div class="progress-info">
-                                <span class="name">Самозанятые / ИП</span>
+                                <span class="name">${t.selfEmployed}</span>
                                 <span class="stats">${by_category.self_employed.completed} / ${by_category.self_employed.quota} (${by_category.self_employed.progress}%)</span>
                             </div>
                             <div class="progress-bar">
@@ -390,7 +541,7 @@
                 </div>
 
                 <div class="last-updated">
-                    Последнее обновление: ${last_updated}
+                    ${t.lastUpdated} ${last_updated}
                 </div>
             `;
             
@@ -400,13 +551,15 @@
         async function downloadExcel() {
             try {
                 const btn = event.target;
+                const t = translations[currentLang];
+                const originalText = btn.innerHTML;
                 btn.disabled = true;
-                btn.innerHTML = '⏳ Генерация...';
+                btn.innerHTML = '⏳ ' + (currentLang === 'ru' ? 'Генерация...' : currentLang === 'en' ? 'Generating...' : 'Генерацияланып жатыр...');
                 
                 const response = await fetch(`${API_BASE}/api/download`);
                 
                 if (!response.ok) {
-                    throw new Error('Ошибка генерации отчета');
+                    throw new Error(t.errorLoading);
                 }
                 
                 const blob = await response.blob();
@@ -420,12 +573,12 @@
                 document.body.removeChild(a);
                 
                 btn.disabled = false;
-                btn.innerHTML = '📥 Скачать отчет Excel';
+                btn.innerHTML = originalText;
                 
             } catch (error) {
-                alert('Ошибка скачивания: ' + error.message);
+                alert((currentLang === 'ru' ? 'Ошибка скачивания: ' : currentLang === 'en' ? 'Download error: ' : 'Жүктеу қатесі: ') + error.message);
                 event.target.disabled = false;
-                event.target.innerHTML = '📥 Скачать отчет Excel';
+                event.target.innerHTML = translations[currentLang].btnDownload;
             }
         }
     </script>
