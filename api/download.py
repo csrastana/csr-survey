@@ -1,7 +1,7 @@
 """
 Serverless функция для генерации многолистового Excel отчета
 URL: /api/download
-ИСПРАВЛЕННАЯ ВЕРСИЯ - с реальными названиями полей из XLSForm
+С ПОДДЕРЖКОЙ ПАГИНАЦИИ - получает ВСЕ записи
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -42,15 +42,30 @@ QUOTAS = {
 }
 
 def fetch_kobo_data():
-    """Загрузка данных из Kobo"""
-    url = f"https://kf.kobotoolbox.org/api/v2/assets/{ASSET_ID}/data.json"
+    """
+    Загрузка ВСЕХ данных из Kobo с пагинацией
+    """
     headers = {'Authorization': f'Token {KOBO_API_TOKEN}'}
     
-    response = requests.get(url, headers=headers, timeout=30)
-    response.raise_for_status()
+    all_results = []
+    url = f"https://kf.kobotoolbox.org/api/v2/assets/{ASSET_ID}/data.json?limit=100"
     
-    data = response.json()
-    return data.get('results', [])
+    while url:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        results = data.get('results', [])
+        all_results.extend(results)
+        
+        # Следующая страница
+        url = data.get('next')
+        
+        # Безопасность: останавливаемся после 5000 записей
+        if len(all_results) > 5000:
+            break
+    
+    return all_results
 
 def process_data(records):
     """Обработка данных"""
@@ -61,16 +76,16 @@ def process_data(records):
         city_code = record.get('city', '')
         city = CITY_CODES.get(str(city_code), f'Неизвестно ({city_code})')
         
-        # Дата и время (из группы group_xn8xb93)
+        # Дата и время
         date_raw = record.get('group_xn8xb93/date', '')
         time_raw = record.get('group_xn8xb93/time', '')
         time_clean = str(time_raw).split('+')[0].split('.')[0] if time_raw else ''
         
-        # Результат (из группы group_ip3jm92)
+        # Результат
         result_code = record.get('group_ip3jm92/result', '')
         result = RESULT_CODES.get(str(result_code), f'Неизвестно ({result_code})')
         
-        # Готовность и согласие (коды!)
+        # Готовность и согласие
         willingness = record.get('willingness', '')
         consent = record.get('consent', '')
         q08 = record.get('q08_survey2', '')
@@ -93,7 +108,7 @@ def process_data(records):
         else:
             category = 'Другое'
         
-        # Язык респондента (из группы group_xl1fx65)
+        # Язык респондента
         language = record.get('group_xl1fx65/lang_resp', '')
         
         # Проверка на контакт
