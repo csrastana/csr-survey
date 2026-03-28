@@ -1,7 +1,7 @@
 """
 Serverless функция для получения статистики опроса
 URL: /api/stats
-ИСПРАВЛЕННАЯ ВЕРСИЯ - с реальными названиями полей из XLSForm
+С ПОДДЕРЖКОЙ ПАГИНАЦИИ - получает ВСЕ записи
 """
 
 from http.server import BaseHTTPRequestHandler
@@ -13,7 +13,7 @@ from datetime import datetime
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
 
-# Маппинг кодов городов (из XLSForm choices)
+# Маппинг кодов городов
 CITY_CODES = {
     '710000000': 'г. Астана',
     '750000000': 'г. Алматы',
@@ -60,27 +60,42 @@ QUOTAS = {
 }
 
 def fetch_kobo_data():
-    """Загрузка данных из Kobo"""
-    url = f"https://kf.kobotoolbox.org/api/v2/assets/{ASSET_ID}/data.json"
+    """
+    Загрузка ВСЕХ данных из Kobo с пагинацией
+    Kobo API возвращает максимум 100 записей за раз - нужна пагинация!
+    """
     headers = {'Authorization': f'Token {KOBO_API_TOKEN}'}
     
-    response = requests.get(url, headers=headers, timeout=30)
-    response.raise_for_status()
+    all_results = []
+    url = f"https://kf.kobotoolbox.org/api/v2/assets/{ASSET_ID}/data.json?limit=100"
     
-    data = response.json()
-    return data.get('results', [])
+    while url:
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        results = data.get('results', [])
+        all_results.extend(results)
+        
+        # Следующая страница (если есть)
+        url = data.get('next')
+        
+        # Безопасность: останавливаемся после 50 страниц (5000 записей)
+        if len(all_results) > 5000:
+            break
+    
+    return all_results
 
 def process_record(record):
     """Обработка одной записи"""
-    # Правильные названия полей (из XLSForm)
-    # Поля в группе group_xn8xb93
-    city_code = record.get('city', '')  # Это КОД, не текст!
+    # Правильные названия полей из XLSForm
+    city_code = record.get('city', '')
     city = CITY_CODES.get(str(city_code), f'Неизвестно ({city_code})')
     
     peo = record.get('group_xn8xb93/PEO', '')
     interviewer = record.get('group_xn8xb93/int_name', '')
     
-    # Результат визита (в группе group_ip3jm92)
+    # Результат визита
     result_code = record.get('group_ip3jm92/result', '')
     result = RESULT_CODES.get(str(result_code), f'Неизвестно ({result_code})')
     
@@ -197,7 +212,7 @@ def calculate_statistics(records):
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            # Загрузка данных
+            # Загрузка ВСЕХ данных (с пагинацией)
             records = fetch_kobo_data()
             
             # Вычисление статистики
