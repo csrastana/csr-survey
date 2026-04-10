@@ -249,10 +249,17 @@ def calculate_statistics(records):
     city_stats = {}
     for city_name, quota_info in QUOTAS.items():
         city_records = [r for r in processed if r['city'] == city_name]
+        city_visits = len(city_records)
         city_completed = sum(1 for r in city_records if r['is_completed'])
         city_contacts = sum(1 for r in city_records if r['is_contact'])
         city_employed = sum(1 for r in city_records if r['is_completed'] and r['category'] == 'employed')
         city_self_employed = sum(1 for r in city_records if r['is_completed'] and r['category'] == 'self_employed')
+
+        # Участие в опросе
+        city_refusals = sum(1 for r in city_records if r['is_refusal'])
+        city_not_agreed = city_visits - city_completed
+        city_not_agreed_other = city_not_agreed - city_refusals  # неконтакты / барьер / другое / контакт без согласия
+        agreement_rate = round((city_completed / city_visits * 100) if city_visits > 0 else 0, 1)
 
         # Валидация по городу (считаем по всем анкетам города)
         city_approved = sum(1 for r in city_records if r['validation'] == 'approved')
@@ -260,7 +267,7 @@ def calculate_statistics(records):
         city_no_status = sum(1 for r in city_records if r['validation'] == 'no_status')
 
         city_stats[city_name] = {
-            'visits': len(city_records),
+            'visits': city_visits,
             'completed': city_completed,
             'employed': city_employed,
             'self_employed': city_self_employed,
@@ -269,7 +276,12 @@ def calculate_statistics(records):
             'quota_self_employed': quota_info['self_employed'],
             'peo_count': quota_info['peo_count'],
             'progress': round((city_completed / quota_info['total'] * 100) if quota_info['total'] > 0 else 0, 2),
-            'contact_rate': round((city_contacts / len(city_records) * 100) if len(city_records) > 0 else 0, 1),
+            'contact_rate': round((city_contacts / city_visits * 100) if city_visits > 0 else 0, 1),
+            'agreed': city_completed,
+            'not_agreed': city_not_agreed,
+            'refusals': city_refusals,
+            'not_agreed_other': city_not_agreed_other,
+            'agreement_rate': agreement_rate,
             'approved': city_approved,
             'not_approved': city_not_approved,
             'no_status': city_no_status,
