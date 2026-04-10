@@ -6,16 +6,46 @@ URL: /api/download
 
 from http.server import BaseHTTPRequestHandler
 import json
+import re
 import requests
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from datetime import datetime
+from datetime import datetime, date
 import io
 
 # Конфигурация
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
+
+# ---- Фильтр Шымкента: учитываем визиты только с 26 марта 2026 ----
+SHYMKENT_MIN_DATE = date(2026, 3, 26)
+DATE_RE = re.compile(r'(\d{4}-\d{2}-\d{2})')
+
+
+def parse_visit_date(raw):
+    """Парсит дату из строки group_xn8xb93/date в datetime.date или None."""
+    if not raw:
+        return None
+    m = DATE_RE.search(str(raw))
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+def get_validation_status(record):
+    """Возвращает 'Валидирована' / 'Не валидирована' / 'Без статуса'."""
+    vs = record.get('_validation_status')
+    if isinstance(vs, dict):
+        uid = vs.get('uid', '')
+        if uid == 'validation_status_approved':
+            return 'Валидирована'
+        if uid == 'validation_status_not_approved':
+            return 'Не валидирована'
+    return 'Без статуса'
 
 # Маппинг кодов
 CITY_CODES = {
@@ -81,6 +111,12 @@ def process_data(records):
         time_raw = record.get('group_xn8xb93/time', '')
         time_clean = str(time_raw).split('+')[0].split('.')[0] if time_raw else ''
         
+        # Парсим дату визита для фильтра
+        visit_date = parse_visit_date(date_raw)
+        
+        # Статус валидации
+        validation = get_validation_status(record)
+        
         # Результат
         result_code = record.get('group_ip3jm92/result', '')
         result = RESULT_CODES.get(str(result_code), f'Неизвестно ({result_code})')
@@ -126,8 +162,20 @@ def process_data(records):
             'language': language,
             'attempt': record.get('group_xn8xb93/attempt', ''),
             'is_completed': is_completed,
-            'is_contact': is_contact
+            'is_contact': is_contact,
+            'validation': validation,
+            'visit_date': visit_date,
         })
+    
+    # --- Фильтр Шымкента: исключаем визиты до 26 марта 2026 ---
+    def keep(r):
+        if r['city'] != 'г. Шымкент':
+            return True
+        if r['visit_date'] is None:
+            return False
+        return r['visit_date'] >= SHYMKENT_MIN_DATE
+    
+    processed = [r for r in processed if keep(r)]
     
     return processed
 
@@ -182,16 +230,23 @@ def create_dashboard_sheet(wb, processed_data):
     ws['D14'] = 'Прогресс (%)'
     ws['E14'] = 'Наемных'
     ws['F14'] = 'Самозанятых'
+    ws['G14'] = 'Валидированы'
+    ws['H14'] = 'Не валидированы'
+    ws['I14'] = 'Без статуса'
     
-    for col in ['A14', 'B14', 'C14', 'D14', 'E14', 'F14']:
+    for col in ['A14', 'B14', 'C14', 'D14', 'E14', 'F14', 'G14', 'H14', 'I14']:
         ws[col].font = header_font
         ws[col].fill = header_fill
     
     row = 15
     for city, quota in QUOTAS.items():
-        city_completed = sum(1 for r in processed_data if r['city'] == city and r['is_completed'])
-        city_employed = sum(1 for r in processed_data if r['city'] == city and r['category'] == 'Наемный работник')
-        city_self = sum(1 for r in processed_data if r['city'] == city and r['category'] == 'Самозанятый/ИП')
+        city_records = [r for r in processed_data if r['city'] == city]
+        city_completed = sum(1 for r in city_records if r['is_completed'])
+        city_employed = sum(1 for r in city_records if r['category'] == 'Наемный работник')
+        city_self = sum(1 for r in city_records if r['category'] == 'Самозанятый/ИП')
+        city_approved = sum(1 for r in city_records if r['validation'] == 'Валидирована')
+        city_not_approved = sum(1 for r in city_records if r['validation'] == 'Не валидирована')
+        city_no_status = sum(1 for r in city_records if r['validation'] == 'Без статуса')
         progress = round((city_completed / quota['total'] * 100) if quota['total'] > 0 else 0, 1)
         
         ws[f'A{row}'] = city
@@ -200,6 +255,9 @@ def create_dashboard_sheet(wb, processed_data):
         ws[f'D{row}'] = f"{progress}%"
         ws[f'E{row}'] = f"{city_employed}/{quota['employed']}"
         ws[f'F{row}'] = f"{city_self}/{quota['self_employed']}"
+        ws[f'G{row}'] = city_approved
+        ws[f'H{row}'] = city_not_approved
+        ws[f'I{row}'] = city_no_status
         row += 1
     
     # Автоширина
@@ -316,7 +374,7 @@ def create_raw_data_sheet(wb, processed_data):
     """Создание листа Raw Data"""
     ws = wb.create_sheet("Raw Data")
     
-    headers = ['Дата', 'Время', 'Город', 'ПЕО', 'Сегмент', 'Интервьюер', 'Результат', 'Категория', 'Язык', 'Попытка']
+    headers = ['Дата', 'Время', 'Город', 'ПЕО', 'Сегмент', 'Интервьюер', 'Результат', 'Категория', 'Язык', 'Попытка', 'Статус валидации']
     ws.append(headers)
     
     header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
@@ -338,7 +396,8 @@ def create_raw_data_sheet(wb, processed_data):
             record['result'],
             record['category'],
             record['language'],
-            record['attempt']
+            record['attempt'],
+            record['validation']
         ])
     
     # Автоширина
