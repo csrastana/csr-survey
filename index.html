@@ -351,6 +351,10 @@
                 peoMultiplier: 'ПЕО × 25 человек',
                 employedShort: 'Наемных:',
                 selfEmployedShort: 'Самозанятых:',
+                validationProgress: '✅ Валидация анкет по городам',
+                approved: 'Валидированы',
+                notApproved: 'Не валидированы',
+                noStatus: 'Без статуса',
                 errorLoading: 'Ошибка загрузки данных'
             },
             en: {
@@ -372,6 +376,10 @@
                 peoMultiplier: 'PEO × 25 people',
                 employedShort: 'Employed:',
                 selfEmployedShort: 'Self-employed:',
+                validationProgress: '✅ Survey validation by city',
+                approved: 'Approved',
+                notApproved: 'Not approved',
+                noStatus: 'No status',
                 errorLoading: 'Data loading error'
             },
             kk: {
@@ -393,6 +401,10 @@
                 peoMultiplier: 'СУО × 25 адам',
                 employedShort: 'Жалдамалы:',
                 selfEmployedShort: 'Өзін-өзі қамтыған:',
+                validationProgress: '✅ Қалалар бойынша валидация',
+                approved: 'Валидацияланды',
+                notApproved: 'Валидацияланбады',
+                noStatus: 'Мәртебесіз',
                 errorLoading: 'Деректерді жүктеу қатесі'
             }
         };
@@ -537,6 +549,36 @@
                                 <div class="progress-fill" style="width: ${Math.min(by_category.self_employed.progress, 100)}%"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>${t.validationProgress}</h2>
+                    <div class="city-grid">
+                        ${Object.entries(by_city).map(([city, stats]) => {
+                            const visits = stats.visits || 0;
+                            const approved = stats.approved || 0;
+                            const notApproved = stats.not_approved || 0;
+                            const noStatus = stats.no_status || 0;
+                            const approvedPct = visits > 0 ? (approved / visits * 100) : 0;
+                            const notApprovedPct = visits > 0 ? (notApproved / visits * 100) : 0;
+                            return `
+                            <div class="progress-bar-container">
+                                <div class="progress-info">
+                                    <span class="name">${city}</span>
+                                    <span class="stats">${approved} / ${visits} (${approvedPct.toFixed(1)}%)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${Math.min(approvedPct, 100)}%"></div>
+                                </div>
+                                <div class="quota-details">
+                                    ✅ ${t.approved}: <strong>${approved}</strong> |
+                                    ❌ ${t.notApproved}: <strong>${notApproved}</strong> (${notApprovedPct.toFixed(1)}%) |
+                                    ⏳ ${t.noStatus}: <strong>${noStatus}</strong>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
 
