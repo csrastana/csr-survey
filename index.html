@@ -185,6 +185,23 @@
             opacity: 0.8;
         }
 
+        .stat-card .hint {
+            font-size: 11px;
+            opacity: 0.75;
+            font-style: italic;
+            margin-top: 4px;
+        }
+
+        .section-note {
+            font-size: 13px;
+            color: #6c757d;
+            margin-bottom: 15px;
+            padding: 10px 14px;
+            background: #f1f3f5;
+            border-left: 3px solid #667eea;
+            border-radius: 4px;
+        }
+
         .section {
             padding: 30px;
             border-bottom: 1px solid #dee2e6;
@@ -339,18 +356,26 @@
                 btnDownload: '📥 Скачать отчет Excel',
                 loadingText: 'Загрузка данных...',
                 totalVisits: 'Всего визитов',
+                totalVisitsHint: 'все записи по столбцу «Город»',
                 completed: 'Завершено',
+                completedHint: 'согласились участвовать',
                 of: 'из',
                 responseRate: 'Response Rate',
                 contactRate: 'Contact Rate',
                 cityProgress: '📍 Прогресс по городам',
                 categoryProgress: '👥 Прогресс по категориям',
+                participationProgress: '🤝 Участие в опросе по городам',
+                participationNote: 'Какая доля респондентов согласилась участвовать в опросе (willingness=Да и consent=Да) от общего количества визитов по каждому городу',
+                agreed: 'Согласились',
+                refusals: 'Отказы',
+                notAgreedOther: 'Неконтакты/прочее',
                 employed: 'Наемные работники',
                 selfEmployed: 'Самозанятые / ИП',
                 lastUpdated: 'Последнее обновление:',
                 peoMultiplier: 'ПЕО × 25 человек',
                 employedShort: 'Наемных:',
                 selfEmployedShort: 'Самозанятых:',
+                completedShort: 'Завершено:',
                 validationProgress: '✅ Валидация анкет по городам',
                 approved: 'Валидированы',
                 notApproved: 'Не валидированы',
@@ -364,18 +389,26 @@
                 btnDownload: '📥 Download Excel report',
                 loadingText: 'Loading data...',
                 totalVisits: 'Total visits',
+                totalVisitsHint: 'all records in the «City» column',
                 completed: 'Completed',
+                completedHint: 'agreed to participate',
                 of: 'of',
                 responseRate: 'Response Rate',
                 contactRate: 'Contact Rate',
                 cityProgress: '📍 Progress by city',
                 categoryProgress: '👥 Progress by category',
+                participationProgress: '🤝 Participation by city',
+                participationNote: 'Share of respondents who agreed to participate (willingness=Yes and consent=Yes) out of total visits per city',
+                agreed: 'Agreed',
+                refusals: 'Refusals',
+                notAgreedOther: 'Non-contacts/other',
                 employed: 'Wage employees',
                 selfEmployed: 'Self-employed / IE',
                 lastUpdated: 'Last updated:',
                 peoMultiplier: 'PEO × 25 people',
                 employedShort: 'Employed:',
                 selfEmployedShort: 'Self-employed:',
+                completedShort: 'Completed:',
                 validationProgress: '✅ Survey validation by city',
                 approved: 'Approved',
                 notApproved: 'Not approved',
@@ -389,18 +422,26 @@
                 btnDownload: '📥 Excel есебін жүктеу',
                 loadingText: 'Деректер жүктелуде...',
                 totalVisits: 'Барлық сапарлар',
+                totalVisitsHint: '«Қала» бағанындағы барлық жазбалар',
                 completed: 'Аяқталды',
+                completedHint: 'қатысуға келісті',
                 of: 'дан',
                 responseRate: 'Жауап беру деңгейі',
                 contactRate: 'Байланыс деңгейі',
                 cityProgress: '📍 Қалалар бойынша прогресс',
                 categoryProgress: '👥 Санаттар бойынша прогресс',
+                participationProgress: '🤝 Қалалар бойынша қатысу',
+                participationNote: 'Әр қала бойынша сапарлардың жалпы санынан сауалнамаға қатысуға келіскен респонденттердің үлесі (willingness=Иә және consent=Иә)',
+                agreed: 'Келісті',
+                refusals: 'Бас тартулар',
+                notAgreedOther: 'Байланыссыз/басқа',
                 employed: 'Жалдамалы қызметкерлер',
                 selfEmployed: 'Өзін-өзі жұмыспен қамтығандар / ЖК',
                 lastUpdated: 'Соңғы жаңарту:',
                 peoMultiplier: 'СУО × 25 адам',
                 employedShort: 'Жалдамалы:',
                 selfEmployedShort: 'Өзін-өзі қамтыған:',
+                completedShort: 'Аяқталды:',
                 validationProgress: '✅ Қалалар бойынша валидация',
                 approved: 'Валидацияланды',
                 notApproved: 'Валидацияланбады',
@@ -490,11 +531,13 @@
                     <div class="stat-card">
                         <h3>${t.totalVisits}</h3>
                         <div class="value">${overview.total_visits}</div>
+                        <div class="hint">${t.totalVisitsHint}</div>
                     </div>
                     <div class="stat-card">
                         <h3>${t.completed}</h3>
                         <div class="value">${overview.completed}</div>
                         <div class="subtitle">${t.of} ${overview.total_quota} (${overview.quota_progress}%)</div>
+                        <div class="hint">${t.completedHint}</div>
                     </div>
                     <div class="stat-card">
                         <h3>${t.responseRate}</h3>
@@ -509,22 +552,27 @@
                 <div class="section">
                     <h2>${t.cityProgress}</h2>
                     <div class="city-grid">
-                        ${Object.entries(by_city).map(([city, stats]) => `
+                        ${Object.entries(by_city).map(([city, stats]) => {
+                            const visits = stats.visits || 0;
+                            const visitsPct = stats.quota_total > 0 ? (visits / stats.quota_total * 100) : 0;
+                            return `
                             <div class="progress-bar-container">
                                 <div class="progress-info">
                                     <span class="name">${city}</span>
-                                    <span class="stats">${stats.completed} / ${stats.quota_total} (${stats.progress}%)</span>
+                                    <span class="stats">${visits} / ${stats.quota_total} (${visitsPct.toFixed(2)}%)</span>
                                 </div>
                                 <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${Math.min(stats.progress, 100)}%"></div>
+                                    <div class="progress-fill" style="width: ${Math.min(visitsPct, 100)}%"></div>
                                 </div>
                                 <div class="quota-details">
                                     ${stats.peo_count} ${t.peoMultiplier} | 
+                                    ${t.completedShort} ${stats.completed} | 
                                     ${t.employedShort} ${stats.employed}/${stats.quota_employed} | 
                                     ${t.selfEmployedShort} ${stats.self_employed}/${stats.quota_self_employed}
                                 </div>
                             </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>
                 </div>
 
@@ -549,6 +597,37 @@
                                 <div class="progress-fill" style="width: ${Math.min(by_category.self_employed.progress, 100)}%"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>${t.participationProgress}</h2>
+                    <div class="section-note">${t.participationNote}</div>
+                    <div class="city-grid">
+                        ${Object.entries(by_city).map(([city, stats]) => {
+                            const visits = stats.visits || 0;
+                            const agreed = stats.agreed || 0;
+                            const refusals = stats.refusals || 0;
+                            const other = stats.not_agreed_other || 0;
+                            const notAgreed = (stats.not_agreed || 0);
+                            const agreementRate = stats.agreement_rate || 0;
+                            return `
+                            <div class="progress-bar-container">
+                                <div class="progress-info">
+                                    <span class="name">${city}</span>
+                                    <span class="stats">${agreed} / ${visits} (${agreementRate.toFixed(1)}%)</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${Math.min(agreementRate, 100)}%"></div>
+                                </div>
+                                <div class="quota-details">
+                                    ✅ ${t.agreed}: <strong>${agreed}</strong> |
+                                    ❌ ${t.refusals}: <strong>${refusals}</strong> |
+                                    📵 ${t.notAgreedOther}: <strong>${other}</strong>
+                                </div>
+                            </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
 
