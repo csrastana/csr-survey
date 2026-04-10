@@ -6,12 +6,85 @@ URL: /api/stats
 
 from http.server import BaseHTTPRequestHandler
 import json
+import re
 import requests
-from datetime import datetime
+from datetime import datetime, date
 
 # Конфигурация
 KOBO_API_TOKEN = '929c90ea6bbce9e24789c10b2eb9740e3352d859'
 ASSET_ID = 'aCE5fencfcUpVhvCRdCoxc'
+
+# ---- Фильтр по дате визита для Шымкента ----
+# Исключаем анкеты по г. Шымкент с датой визита ДО этой даты (включительно).
+# Т.е. учитываем только визиты 26 марта 2026 и позже.
+SHYMKENT_MIN_DATE = date(2026, 3, 26)
+
+# Возможные имена поля даты визита в группе group_xn8xb93.
+# Код сначала попытается найти значение по этим именам,
+# затем — автодетектом по любому ключу группы, значение которого парсится как дата.
+VISIT_DATE_FIELDS = [
+    'group_xn8xb93/date',        # подтверждено по коду download.py
+    'group_xn8xb93/visit_date',
+    'group_xn8xb93/date_visit',
+    'group_xn8xb93/v_date',
+]
+
+DATE_RE = re.compile(r'(\d{4}-\d{2}-\d{2})')
+
+
+def extract_visit_date(record):
+    """
+    Возвращает datetime.date даты визита или None.
+    Сначала пробует явные имена, затем сканирует все ключи group_xn8xb93/,
+    в крайнем случае берёт _submission_time.
+    """
+    # 1) Явные имена
+    for key in VISIT_DATE_FIELDS:
+        val = record.get(key)
+        if val:
+            m = DATE_RE.search(str(val))
+            if m:
+                try:
+                    return datetime.strptime(m.group(1), '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+
+    # 2) Автодетект по группе
+    for key, val in record.items():
+        if not key.startswith('group_xn8xb93/') or val is None:
+            continue
+        m = DATE_RE.search(str(val))
+        if m:
+            try:
+                return datetime.strptime(m.group(1), '%Y-%m-%d').date()
+            except ValueError:
+                continue
+
+    # 3) Фоллбэк — время отправки на сервер
+    sub = record.get('_submission_time')
+    if sub:
+        m = DATE_RE.search(str(sub))
+        if m:
+            try:
+                return datetime.strptime(m.group(1), '%Y-%m-%d').date()
+            except ValueError:
+                pass
+    return None
+
+
+def get_validation_status(record):
+    """
+    Возвращает 'approved', 'not_approved' или 'no_status'.
+    Kobo хранит _validation_status как dict с ключом 'uid'.
+    """
+    vs = record.get('_validation_status')
+    if isinstance(vs, dict):
+        uid = vs.get('uid', '')
+        if uid == 'validation_status_approved':
+            return 'approved'
+        if uid == 'validation_status_not_approved':
+            return 'not_approved'
+    return 'no_status'
 
 # Маппинг кодов городов
 CITY_CODES = {
@@ -127,7 +200,11 @@ def process_record(record):
     # Проверка на контакт
     is_contact = str(result_code) == '1'  # '1' = Contact established
     is_refusal = str(result_code) == '5'  # '5' = Household refusal
-    
+
+    # Статус валидации и дата визита
+    validation = get_validation_status(record)
+    visit_date = extract_visit_date(record)
+
     return {
         'city': city,
         'interviewer': interviewer,
@@ -136,13 +213,28 @@ def process_record(record):
         'category': category,
         'is_completed': is_completed,
         'is_contact': is_contact,
-        'is_refusal': is_refusal
+        'is_refusal': is_refusal,
+        'validation': validation,
+        'visit_date': visit_date,
     }
 
 def calculate_statistics(records):
     """Вычисление статистики"""
     processed = [process_record(r) for r in records]
-    
+
+    # --- Фильтр по Шымкенту: исключаем визиты до SHYMKENT_MIN_DATE ---
+    # Для прочих городов — ничего не трогаем.
+    def keep(r):
+        if r['city'] != 'г. Шымкент':
+            return True
+        vd = r['visit_date']
+        if vd is None:
+            # нет даты → не можем подтвердить, что это валидная анкета после 26 марта → исключаем
+            return False
+        return vd >= SHYMKENT_MIN_DATE
+
+    processed = [r for r in processed if keep(r)]
+
     total_visits = len(processed)
     completed = sum(1 for r in processed if r['is_completed'])
     contacts = sum(1 for r in processed if r['is_contact'])
@@ -161,7 +253,12 @@ def calculate_statistics(records):
         city_contacts = sum(1 for r in city_records if r['is_contact'])
         city_employed = sum(1 for r in city_records if r['is_completed'] and r['category'] == 'employed')
         city_self_employed = sum(1 for r in city_records if r['is_completed'] and r['category'] == 'self_employed')
-        
+
+        # Валидация по городу (считаем по всем анкетам города)
+        city_approved = sum(1 for r in city_records if r['validation'] == 'approved')
+        city_not_approved = sum(1 for r in city_records if r['validation'] == 'not_approved')
+        city_no_status = sum(1 for r in city_records if r['validation'] == 'no_status')
+
         city_stats[city_name] = {
             'visits': len(city_records),
             'completed': city_completed,
@@ -172,17 +269,25 @@ def calculate_statistics(records):
             'quota_self_employed': quota_info['self_employed'],
             'peo_count': quota_info['peo_count'],
             'progress': round((city_completed / quota_info['total'] * 100) if quota_info['total'] > 0 else 0, 2),
-            'contact_rate': round((city_contacts / len(city_records) * 100) if len(city_records) > 0 else 0, 1)
+            'contact_rate': round((city_contacts / len(city_records) * 100) if len(city_records) > 0 else 0, 1),
+            'approved': city_approved,
+            'not_approved': city_not_approved,
+            'no_status': city_no_status,
         }
     
     # По категориям (общее)
     employed = sum(1 for r in processed if r['category'] == 'employed')
     self_employed = sum(1 for r in processed if r['category'] == 'self_employed')
-    
+
+    # Валидация (общая)
+    total_approved = sum(1 for r in processed if r['validation'] == 'approved')
+    total_not_approved = sum(1 for r in processed if r['validation'] == 'not_approved')
+    total_no_status = sum(1 for r in processed if r['validation'] == 'no_status')
+
     total_quota = sum(q['total'] for q in QUOTAS.values())
     total_employed_quota = sum(q['employed'] for q in QUOTAS.values())
     total_self_employed_quota = sum(q['self_employed'] for q in QUOTAS.values())
-    
+
     return {
         'overview': {
             'total_visits': total_visits,
@@ -191,7 +296,10 @@ def calculate_statistics(records):
             'quota_progress': round((completed / total_quota * 100) if total_quota > 0 else 0, 2),
             'response_rate': response_rate,
             'contact_rate': contact_rate,
-            'refusal_rate': refusal_rate
+            'refusal_rate': refusal_rate,
+            'approved': total_approved,
+            'not_approved': total_not_approved,
+            'no_status': total_no_status,
         },
         'by_city': city_stats,
         'by_category': {
