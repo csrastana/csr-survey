@@ -185,69 +185,6 @@
             opacity: 0.8;
         }
 
-        .stat-card .hint {
-            font-size: 11px;
-            opacity: 0.75;
-            font-style: italic;
-            margin-top: 4px;
-        }
-
-        .section-note {
-            font-size: 13px;
-            color: #6c757d;
-            margin-bottom: 15px;
-            padding: 10px 14px;
-            background: #f1f3f5;
-            border-left: 3px solid #667eea;
-            border-radius: 4px;
-        }
-
-        .section-highlight {
-            background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
-            border-top: 3px solid #ffc107;
-            border-bottom: 3px solid #ffc107;
-        }
-
-        .section-highlight h2 {
-            color: #856404;
-        }
-
-        .sf-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .sf-card {
-            background: white;
-            border-radius: 10px;
-            padding: 18px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border-left: 4px solid #ffc107;
-        }
-
-        .sf-card h4 {
-            font-size: 12px;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-            font-weight: 600;
-        }
-
-        .sf-card .sf-value {
-            font-size: 28px;
-            font-weight: bold;
-            color: #856404;
-        }
-
-        .sf-card .sf-sub {
-            font-size: 12px;
-            color: #6c757d;
-            margin-top: 4px;
-        }
-
         .section {
             padding: 30px;
             border-bottom: 1px solid #dee2e6;
@@ -402,41 +339,18 @@
                 btnDownload: '📥 Скачать отчет Excel',
                 loadingText: 'Загрузка данных...',
                 totalVisits: 'Всего визитов',
-                totalVisitsHint: 'все записи по столбцу «Город»',
                 completed: 'Завершено',
-                completedHint: 'согласились участвовать',
                 of: 'из',
                 responseRate: 'Response Rate',
                 contactRate: 'Contact Rate',
                 cityProgress: '📍 Прогресс по городам',
                 categoryProgress: '👥 Прогресс по категориям',
-                participationProgress: '🤝 Участие в опросе по городам',
-                participationNote: 'Какая доля респондентов согласилась участвовать в опросе (willingness=Да и consent=Да) от общего количества визитов по каждому городу',
-                agreed: 'Согласились',
-                refusals: 'Отказы',
-                notAgreedOther: 'Неконтакты/прочее',
                 employed: 'Наемные работники',
                 selfEmployed: 'Самозанятые / ИП',
                 lastUpdated: 'Последнее обновление:',
                 peoMultiplier: 'ПЕО × 25 человек',
                 employedShort: 'Наемных:',
                 selfEmployedShort: 'Самозанятых:',
-                completedShort: 'Завершено:',
-                validationProgress: '✅ Валидация анкет по городам',
-                approved: 'Валидированы',
-                notApproved: 'Не валидированы',
-                noStatus: 'Без статуса',
-                shymkentFilteredTitle: '📌 Отдельная статистика: г. Шымкент с 26 марта 2026',
-                shymkentFilteredNote: 'Блок ниже — только для г. Шымкент и только по визитам с 26 марта 2026 и позже. Вся статистика выше по всем городам (включая Шымкент) приведена за весь период без фильтров.',
-                sfVisits: 'Всего визитов',
-                sfAgreed: 'Согласились',
-                sfRefusals: 'Отказы',
-                sfOther: 'Неконтакты/прочее',
-                sfEmployed: 'Наемные',
-                sfSelfEmployed: 'Самозанятые/ИП',
-                sfApproved: 'Валидированы',
-                sfNotApproved: 'Не валидированы',
-                sfNoStatus: 'Без статуса',
                 errorLoading: 'Ошибка загрузки данных'
             },
             en: {
@@ -446,41 +360,18 @@
                 btnDownload: '📥 Download Excel report',
                 loadingText: 'Loading data...',
                 totalVisits: 'Total visits',
-                totalVisitsHint: 'all records in the «City» column',
                 completed: 'Completed',
-                completedHint: 'agreed to participate',
                 of: 'of',
                 responseRate: 'Response Rate',
                 contactRate: 'Contact Rate',
                 cityProgress: '📍 Progress by city',
                 categoryProgress: '👥 Progress by category',
-                participationProgress: '🤝 Participation by city',
-                participationNote: 'Share of respondents who agreed to participate (willingness=Yes and consent=Yes) out of total visits per city',
-                agreed: 'Agreed',
-                refusals: 'Refusals',
-                notAgreedOther: 'Non-contacts/other',
                 employed: 'Wage employees',
                 selfEmployed: 'Self-employed / IE',
                 lastUpdated: 'Last updated:',
                 peoMultiplier: 'PEO × 25 people',
                 employedShort: 'Employed:',
                 selfEmployedShort: 'Self-employed:',
-                completedShort: 'Completed:',
-                validationProgress: '✅ Survey validation by city',
-                approved: 'Approved',
-                notApproved: 'Not approved',
-                noStatus: 'No status',
-                shymkentFilteredTitle: '📌 Separate statistics: Shymkent since March 26, 2026',
-                shymkentFilteredNote: 'The block below covers Shymkent only, and only visits from March 26, 2026 onwards. All statistics above cover all cities (including Shymkent) for the entire period without filters.',
-                sfVisits: 'Total visits',
-                sfAgreed: 'Agreed',
-                sfRefusals: 'Refusals',
-                sfOther: 'Non-contacts/other',
-                sfEmployed: 'Wage employees',
-                sfSelfEmployed: 'Self-employed/IE',
-                sfApproved: 'Approved',
-                sfNotApproved: 'Not approved',
-                sfNoStatus: 'No status',
                 errorLoading: 'Data loading error'
             },
             kk: {
@@ -490,41 +381,18 @@
                 btnDownload: '📥 Excel есебін жүктеу',
                 loadingText: 'Деректер жүктелуде...',
                 totalVisits: 'Барлық сапарлар',
-                totalVisitsHint: '«Қала» бағанындағы барлық жазбалар',
                 completed: 'Аяқталды',
-                completedHint: 'қатысуға келісті',
                 of: 'дан',
                 responseRate: 'Жауап беру деңгейі',
                 contactRate: 'Байланыс деңгейі',
                 cityProgress: '📍 Қалалар бойынша прогресс',
                 categoryProgress: '👥 Санаттар бойынша прогресс',
-                participationProgress: '🤝 Қалалар бойынша қатысу',
-                participationNote: 'Әр қала бойынша сапарлардың жалпы санынан сауалнамаға қатысуға келіскен респонденттердің үлесі (willingness=Иә және consent=Иә)',
-                agreed: 'Келісті',
-                refusals: 'Бас тартулар',
-                notAgreedOther: 'Байланыссыз/басқа',
                 employed: 'Жалдамалы қызметкерлер',
                 selfEmployed: 'Өзін-өзі жұмыспен қамтығандар / ЖК',
                 lastUpdated: 'Соңғы жаңарту:',
                 peoMultiplier: 'СУО × 25 адам',
                 employedShort: 'Жалдамалы:',
                 selfEmployedShort: 'Өзін-өзі қамтыған:',
-                completedShort: 'Аяқталды:',
-                validationProgress: '✅ Қалалар бойынша валидация',
-                approved: 'Валидацияланды',
-                notApproved: 'Валидацияланбады',
-                noStatus: 'Мәртебесіз',
-                shymkentFilteredTitle: '📌 Жеке статистика: 2026 жылғы 26 наурыздан бастап Шымкент қ.',
-                shymkentFilteredNote: 'Төмендегі блок тек Шымкент қаласы бойынша және тек 2026 жылғы 26 наурыздан бастап жасалған сапарлар бойынша. Жоғарыдағы барлық статистика барлық қалалар бойынша (Шымкентті қоса) бүкіл кезеңге сүзгісіз берілген.',
-                sfVisits: 'Барлық сапарлар',
-                sfAgreed: 'Келісті',
-                sfRefusals: 'Бас тартулар',
-                sfOther: 'Байланыссыз/басқа',
-                sfEmployed: 'Жалдамалы',
-                sfSelfEmployed: 'Өзін-өзі қамтыған/ЖК',
-                sfApproved: 'Валидацияланды',
-                sfNotApproved: 'Валидацияланбады',
-                sfNoStatus: 'Мәртебесіз',
                 errorLoading: 'Деректерді жүктеу қатесі'
             }
         };
@@ -610,13 +478,11 @@
                     <div class="stat-card">
                         <h3>${t.totalVisits}</h3>
                         <div class="value">${overview.total_visits}</div>
-                        <div class="hint">${t.totalVisitsHint}</div>
                     </div>
                     <div class="stat-card">
                         <h3>${t.completed}</h3>
                         <div class="value">${overview.completed}</div>
                         <div class="subtitle">${t.of} ${overview.total_quota} (${overview.quota_progress}%)</div>
-                        <div class="hint">${t.completedHint}</div>
                     </div>
                     <div class="stat-card">
                         <h3>${t.responseRate}</h3>
@@ -631,27 +497,22 @@
                 <div class="section">
                     <h2>${t.cityProgress}</h2>
                     <div class="city-grid">
-                        ${Object.entries(by_city).map(([city, stats]) => {
-                            const visits = stats.visits || 0;
-                            const visitsPct = stats.quota_total > 0 ? (visits / stats.quota_total * 100) : 0;
-                            return `
+                        ${Object.entries(by_city).map(([city, stats]) => `
                             <div class="progress-bar-container">
                                 <div class="progress-info">
                                     <span class="name">${city}</span>
-                                    <span class="stats">${visits} / ${stats.quota_total} (${visitsPct.toFixed(2)}%)</span>
+                                    <span class="stats">${stats.completed} / ${stats.quota_total} (${stats.progress}%)</span>
                                 </div>
                                 <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${Math.min(visitsPct, 100)}%"></div>
+                                    <div class="progress-fill" style="width: ${Math.min(stats.progress, 100)}%"></div>
                                 </div>
                                 <div class="quota-details">
                                     ${stats.peo_count} ${t.peoMultiplier} | 
-                                    ${t.completedShort} ${stats.completed} | 
                                     ${t.employedShort} ${stats.employed}/${stats.quota_employed} | 
                                     ${t.selfEmployedShort} ${stats.self_employed}/${stats.quota_self_employed}
                                 </div>
                             </div>
-                            `;
-                        }).join('')}
+                        `).join('')}
                     </div>
                 </div>
 
@@ -678,126 +539,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="section">
-                    <h2>${t.participationProgress}</h2>
-                    <div class="section-note">${t.participationNote}</div>
-                    <div class="city-grid">
-                        ${Object.entries(by_city).map(([city, stats]) => {
-                            const visits = stats.visits || 0;
-                            const agreed = stats.agreed || 0;
-                            const refusals = stats.refusals || 0;
-                            const other = stats.not_agreed_other || 0;
-                            const notAgreed = (stats.not_agreed || 0);
-                            const agreementRate = stats.agreement_rate || 0;
-                            return `
-                            <div class="progress-bar-container">
-                                <div class="progress-info">
-                                    <span class="name">${city}</span>
-                                    <span class="stats">${agreed} / ${visits} (${agreementRate.toFixed(1)}%)</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${Math.min(agreementRate, 100)}%"></div>
-                                </div>
-                                <div class="quota-details">
-                                    ✅ ${t.agreed}: <strong>${agreed}</strong> |
-                                    ❌ ${t.refusals}: <strong>${refusals}</strong> |
-                                    📵 ${t.notAgreedOther}: <strong>${other}</strong>
-                                </div>
-                            </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h2>${t.validationProgress}</h2>
-                    <div class="city-grid">
-                        ${Object.entries(by_city).map(([city, stats]) => {
-                            const visits = stats.visits || 0;
-                            const approved = stats.approved || 0;
-                            const notApproved = stats.not_approved || 0;
-                            const noStatus = stats.no_status || 0;
-                            const approvedPct = visits > 0 ? (approved / visits * 100) : 0;
-                            const notApprovedPct = visits > 0 ? (notApproved / visits * 100) : 0;
-                            return `
-                            <div class="progress-bar-container">
-                                <div class="progress-info">
-                                    <span class="name">${city}</span>
-                                    <span class="stats">${approved} / ${visits} (${approvedPct.toFixed(1)}%)</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${Math.min(approvedPct, 100)}%"></div>
-                                </div>
-                                <div class="quota-details">
-                                    ✅ ${t.approved}: <strong>${approved}</strong> |
-                                    ❌ ${t.notApproved}: <strong>${notApproved}</strong> (${notApprovedPct.toFixed(1)}%) |
-                                    ⏳ ${t.noStatus}: <strong>${noStatus}</strong>
-                                </div>
-                            </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-
-                ${data.shymkent_filtered ? (() => {
-                    const sf = data.shymkent_filtered;
-                    const agreementRate = sf.agreement_rate || 0;
-                    const approvedPct = sf.visits > 0 ? (sf.approved / sf.visits * 100) : 0;
-                    return `
-                    <div class="section section-highlight">
-                        <h2>${t.shymkentFilteredTitle}</h2>
-                        <div class="section-note">${t.shymkentFilteredNote}</div>
-
-                        <div class="sf-grid">
-                            <div class="sf-card">
-                                <h4>${t.sfVisits}</h4>
-                                <div class="sf-value">${sf.visits}</div>
-                                <div class="sf-sub">${t.of} ${sf.quota_total}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>${t.sfAgreed}</h4>
-                                <div class="sf-value">${sf.agreed}</div>
-                                <div class="sf-sub">${agreementRate.toFixed(1)}% ${t.of} ${sf.visits}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>${t.sfRefusals}</h4>
-                                <div class="sf-value">${sf.refusals}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>${t.sfOther}</h4>
-                                <div class="sf-value">${sf.not_agreed_other}</div>
-                            </div>
-                        </div>
-
-                        <div class="sf-grid">
-                            <div class="sf-card">
-                                <h4>${t.sfEmployed}</h4>
-                                <div class="sf-value">${sf.employed}</div>
-                                <div class="sf-sub">${t.of} ${sf.quota_employed}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>${t.sfSelfEmployed}</h4>
-                                <div class="sf-value">${sf.self_employed}</div>
-                                <div class="sf-sub">${t.of} ${sf.quota_self_employed}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>✅ ${t.sfApproved}</h4>
-                                <div class="sf-value">${sf.approved}</div>
-                                <div class="sf-sub">${approvedPct.toFixed(1)}% ${t.of} ${sf.visits}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>❌ ${t.sfNotApproved}</h4>
-                                <div class="sf-value">${sf.not_approved}</div>
-                            </div>
-                            <div class="sf-card">
-                                <h4>⏳ ${t.sfNoStatus}</h4>
-                                <div class="sf-value">${sf.no_status}</div>
-                            </div>
-                        </div>
-                    </div>
-                    `;
-                })() : ''}
 
                 <div class="last-updated">
                     ${t.lastUpdated} ${last_updated}
