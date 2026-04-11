@@ -219,21 +219,8 @@ def process_record(record):
     }
 
 def calculate_statistics(records):
-    """Вычисление статистики"""
+    """Вычисление статистики по всем записям (без фильтров)"""
     processed = [process_record(r) for r in records]
-
-    # --- Фильтр по Шымкенту: исключаем визиты до SHYMKENT_MIN_DATE ---
-    # Для прочих городов — ничего не трогаем.
-    def keep(r):
-        if r['city'] != 'г. Шымкент':
-            return True
-        vd = r['visit_date']
-        if vd is None:
-            # нет даты → не можем подтвердить, что это валидная анкета после 26 марта → исключаем
-            return False
-        return vd >= SHYMKENT_MIN_DATE
-
-    processed = [r for r in processed if keep(r)]
 
     total_visits = len(processed)
     completed = sum(1 for r in processed if r['is_completed'])
@@ -329,28 +316,85 @@ def calculate_statistics(records):
         'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
+def calculate_shymkent_filtered(records):
+    """
+    Отдельный блок: только г. Шымкент, только визиты с SHYMKENT_MIN_DATE и позже.
+    Структура совпадает со структурой элемента by_city + добавлены quota-поля.
+    """
+    city_name = 'г. Шымкент'
+    quota_info = QUOTAS[city_name]
+
+    processed = [process_record(r) for r in records]
+    city_records = [
+        r for r in processed
+        if r['city'] == city_name
+        and r['visit_date'] is not None
+        and r['visit_date'] >= SHYMKENT_MIN_DATE
+    ]
+
+    visits = len(city_records)
+    completed = sum(1 for r in city_records if r['is_completed'])
+    contacts = sum(1 for r in city_records if r['is_contact'])
+    refusals = sum(1 for r in city_records if r['is_refusal'])
+    employed = sum(1 for r in city_records if r['is_completed'] and r['category'] == 'employed')
+    self_employed = sum(1 for r in city_records if r['is_completed'] and r['category'] == 'self_employed')
+
+    not_agreed = visits - completed
+    not_agreed_other = not_agreed - refusals
+
+    approved = sum(1 for r in city_records if r['validation'] == 'approved')
+    not_approved = sum(1 for r in city_records if r['validation'] == 'not_approved')
+    no_status = sum(1 for r in city_records if r['validation'] == 'no_status')
+
+    return {
+        'city': city_name,
+        'min_date': SHYMKENT_MIN_DATE.strftime('%Y-%m-%d'),
+        'visits': visits,
+        'completed': completed,
+        'employed': employed,
+        'self_employed': self_employed,
+        'quota_total': quota_info['total'],
+        'quota_employed': quota_info['employed'],
+        'quota_self_employed': quota_info['self_employed'],
+        'peo_count': quota_info['peo_count'],
+        'progress': round((completed / quota_info['total'] * 100) if quota_info['total'] > 0 else 0, 2),
+        'contact_rate': round((contacts / visits * 100) if visits > 0 else 0, 1),
+        'agreed': completed,
+        'not_agreed': not_agreed,
+        'refusals': refusals,
+        'not_agreed_other': not_agreed_other,
+        'agreement_rate': round((completed / visits * 100) if visits > 0 else 0, 1),
+        'approved': approved,
+        'not_approved': not_approved,
+        'no_status': no_status,
+    }
+
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             # Загрузка ВСЕХ данных (с пагинацией)
             records = fetch_kobo_data()
-            
-            # Вычисление статистики
+
+            # Общая статистика (без фильтров)
             stats = calculate_statistics(records)
-            
+
+            # Отдельный блок: Шымкент с 26 марта 2026
+            stats['shymkent_filtered'] = calculate_shymkent_filtered(records)
+
             # Ответ
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            
+
             self.wfile.write(json.dumps(stats, ensure_ascii=False).encode('utf-8'))
-            
+
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            
+
             error_response = {
                 'error': str(e),
                 'message': 'Ошибка загрузки данных'
